@@ -9,8 +9,6 @@ import L from "https://code4sabae.github.io/leaflet-mjs/leaflet.mjs";
 import { CSV } from "https://js.sabae.cc/CSV.js";
 import { toHalf } from "https://js.sabae.cc/toHalf.js";
 
-
-
 const map = L.map("mapid");
 // set 国土地理院地図 https://maps.gsi.go.jp/development/ichiran.html
 L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
@@ -22,9 +20,7 @@ const toLL = ll => [ll[1], ll[0]];
 
 const lls = [];
 
-// 人口
-// https://data.bodik.jp/dataset/271403_opendatamap/resource/59198000-187d-4398-89cd-6ff0a78dfd8b
-
+// 街区ポリゴン
 // https://data.bodik.jp/dataset/85acdd24-25a6-4b65-903d-d5790f3a6b4c/resource/ffd232fe-46f2-4938-8357-581d232e38dc/download/271403_osaka_sakai.geojson
 const url = "./data/271403_osaka_sakai.geojson";
 const geojson = await (await fetch(url)).json();
@@ -43,6 +39,8 @@ for (const f of geojson.features) {
 if (lls.length) {
   map.fitBounds(lls);
 }
+// 人口（未使用）
+// https://data.bodik.jp/dataset/271403_opendatamap/resource/59198000-187d-4398-89cd-6ff0a78dfd8b
 
 // さかしる企業オープンデータ
 {
