@@ -35,8 +35,11 @@ const lls = [];
 // https://data.bodik.jp/dataset/85acdd24-25a6-4b65-903d-d5790f3a6b4c/resource/ffd232fe-46f2-4938-8357-581d232e38dc/download/271403_osaka_sakai.geojson
 const url = "./data/271403_osaka_sakai.geojson";
 const geojson = await (await fetch(url)).json();
+let idx = 0;
 for (const f of geojson.features) {
-  const geo = L.geoJSON(f);
+  const hue = (idx++ * 50) % 360;
+  const style = { color: `hsl(${hue},100%,30%)`, opacity: 1.0, fillOpacity: .1 };
+  const geo = L.geoJSON(f, { style });
   geo.addTo(map);
   lls.push(toLL(f.geometry.coordinates[0][0]));
   geo.bindPopup(f.properties.MOJI);
