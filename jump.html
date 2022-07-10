@@ -1,0 +1,7 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<script type="module">
+import { getSakacilURL } from "https://codeforosaka.github.io/sakai-biz-opendata-sample-app/getSakacilURL.js";
+const cid = document.location.hash.substring(1);
+const url = await getSakacilURL(cid);
+document.location = url;
+</script>

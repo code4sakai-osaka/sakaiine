@@ -2,28 +2,21 @@
 <link rel="apple-touch-icon" href="map-ogp.png"/>
 <meta property="og:image" content="map-ogp.png"/>
 <meta name="format-detection" content="telephone=no"/>
-<title>さかいいね</title>
-<link rel="stylesheet" href="https://code4sabae.github.io/leaflet-mjs/leaflet.css">
+<title>さかイイね（開発中） - 堺市の働く情報と住む情報がMAP上ですぐわかる！</title>
+<link rel="stylesheet" href="https://code4sabae.github.io/leaflet-mjs/leaflet-grayscale.css">
 <script type="module">
 import L from "https://code4sabae.github.io/leaflet-mjs/leaflet.mjs";
 import { CSV } from "https://js.sabae.cc/CSV.js";
-import { LeafletSprite } from "https://taisukef.github.io/leaflet.sprite-es/src/sprite.js";
+import { toHalf } from "https://js.sabae.cc/toHalf.js";
 
-LeafletSprite.init(L);
 
-const points = [
-  { name: "高校", fn: "sakai_koutougakkou-kyoiku.csv", color: "red" },
-  { name: "中学校", fn: "sakai_tyugakkou-kyoiku.csv", color: "orange" },
-  { name: "小学校", fn: "sakai_r2-4-1shougakkou.csv", color: "yellow" },
-  { name: "支援学校", fn: "sakai_siengakkou-kyoiku.csv", color: "purple" },
-];
 
 const map = L.map("mapid");
 // set 国土地理院地図 https://maps.gsi.go.jp/development/ichiran.html
 L.tileLayer("https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png", {
   attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html">国土地理院</a>"',
   maxZoom: 18,
-}).addTo(map)
+}).addTo(map);
 
 const toLL = ll => [ll[1], ll[0]];
 
@@ -36,35 +29,89 @@ const lls = [];
 const url = "./data/271403_osaka_sakai.geojson";
 const geojson = await (await fetch(url)).json();
 let idx = 0;
+const towns = [];
 for (const f of geojson.features) {
   const hue = (idx++ * 50) % 360;
-  const style = { color: `hsl(${hue},100%,30%)`, opacity: 1.0, fillOpacity: .1 };
+  const style = { color: `hsl(${hue},90%,40%)`, opacity: 1.0, fillOpacity: .1 };
   const geo = L.geoJSON(f, { style });
   geo.addTo(map);
   lls.push(toLL(f.geometry.coordinates[0][0]));
-  geo.bindPopup(f.properties.MOJI);
-}
-
-let iconlayer = L.layerGroup();
-iconlayer.addTo(map);
-for (const p of points) {
-  const data = CSV.toJSON(await CSV.fetch("data/" + p.fn));
-  for (const item of data) {
-    const ll = [ item.緯度, item.経度 ];
-    //const icon = L.spriteIcon(p.color);
-    //const marker = L.marker(ll, { title: item.施設名, icon });
-    const marker = L.circle(ll, { weight: 10, radius: 20, color: p.color });
-    const val = "最寄り駅①,最寄り駅②,最寄りのバス停②,最寄りのバス停③".split(",");
-    const s = val.map(v => `${v}: ${item[v] || ""}`).join("<br>");
-    marker.bindPopup(`<a href=${item.ホームページURL}>${item.施設名}</a><br>${s}`);
-    iconlayer.addLayer(marker)
-    lls.push(ll)
-  }
+  //geo.bindPopup(f.properties.MOJI);
+  geo.data = f;
+  towns.push(geo);
 }
 if (lls.length) {
   map.fitBounds(lls);
 }
 
+// さかしる企業オープンデータ
+{
+  const url = "https://codeforosaka.github.io/sakai-biz-opendata/data/company_all.csv";
+  const sakacil = CSV.toJSON(await CSV.fetch(url));
+  const getCompanies = (townname) => {
+    townname = toHalf(townname);
+    return sakacil.filter(d => d.住所.indexOf(townname) >= 0).map(d => {
+      return `<a href=jump.html#${d.法人番号}>${d.法人名}</a>`;
+    }).join("<br>");
+  };
+
+  const popup = L.popup();
+  for (const town of towns) {
+    town.on("click", (e) => {
+      const content = L.DomUtil.create('div', 'content');
+      const townname = town.data.properties.MOJI;
+      const companies = getCompanies(townname);
+      content.innerHTML = `<b>${townname}</b><br>${companies}`;
+      popup.setContent(content).setLatLng(e.latlng).openOn(map);
+    });
+  }
+}
+// 堺市 交通事故オープンデータ
+{
+  const url = "https://code4fukui.github.io/traffic-accident/data/osaka-sakai.csv";
+  const data = CSV.toJSON(await CSV.fetch(url));
+  const iconlayer = L.layerGroup();
+  iconlayer.addTo(map);
+  for (const item of data) {
+    const ll = [ item.緯度, item.経度 ];
+    //const icon = L.spriteIcon(p.color);
+    //const marker = L.marker(ll, { title: item.施設名, icon });
+    const marker = L.circle(ll, { weight: 5, radius: 5, color: "gray" });
+    const s = [];
+    for (const [key, val] of Object.entries(item)) {
+      s.push(`<tr><th>${key}</th><td>${val}</td></tr>`);
+    }
+    marker.bindPopup(`<table>${s.join("")}</table>`);
+    iconlayer.addLayer(marker);
+    lls.push(ll);
+  }
+}
+// 堺市の学校
+{
+  const points = [
+    { name: "高校", fn: "sakai_koutougakkou-kyoiku.csv", color: "red" },
+    { name: "中学校", fn: "sakai_tyugakkou-kyoiku.csv", color: "orange" },
+    { name: "小学校", fn: "sakai_r2-4-1shougakkou.csv", color: "yellow" },
+    { name: "支援学校", fn: "sakai_siengakkou-kyoiku.csv", color: "purple" },
+  ];
+
+  const iconlayer = L.layerGroup();
+  iconlayer.addTo(map);
+  for (const p of points) {
+    const data = CSV.toJSON(await CSV.fetch("data/" + p.fn));
+    for (const item of data) {
+      const ll = [ item.緯度, item.経度 ];
+      //const icon = L.spriteIcon(p.color);
+      //const marker = L.marker(ll, { title: item.施設名, icon });
+      const marker = L.circle(ll, { weight: 10, radius: 20, color: p.color });
+      const val = "最寄り駅①,最寄り駅②,最寄りのバス停②,最寄りのバス停③".split(",");
+      const s = val.map(v => `${v}: ${item[v] || ""}`).join("<br>");
+      marker.bindPopup(`<a href=${item.ホームページURL}>${item.施設名}</a><br>${s}`);
+      iconlayer.addLayer(marker);
+      lls.push(ll);
+    }
+  }
+}
 </script>
 <style>
 body {
@@ -117,13 +164,17 @@ a {
 
 <h1 id=title>さかイイね</h1><div class=subtitle>堺市の働く情報と住む情報がMAP上ですぐわかる！（開発中）</div>
 <div id="mapid"></div>
-<div>堺市内の<a href=https://data.bodik.jp/dataset/271403_opendatamap>街区ポリゴン</a>と学校を表示しています。さかしるアイデアソンの成果を元に開発中。</div>
+<div>堺市内の<a href=https://data.bodik.jp/dataset/271403_opendatamap>街区ポリゴン</a>と学校を表示し、街区に対応する企業をリスト表示しています。さかしるアイデアソンの成果を元に開発中。</div>
 
 <div id="link">
   <div id="src">
-    <div>DATA: <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href=https://odcs.bodik.jp/271403/>堺市オープンデータカタログサイト</a></div>
+    <div>DATA: 
+      <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href=https://odcs.bodik.jp/271403/>堺市オープンデータカタログサイト</a>、
+      <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href=https://github.com/codeforosaka/sakai-biz-opendata/>さかしるAPI</a>、
+      <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href=https://www.npa.go.jp/publications/statistics/koutsuu/opendata/index_opendata.html>交通事故統計情報のオープンデータ</a>(<a href=https://github.com/code4fukui/traffic-accident/>CSV版</a>)
+    </div>
     <div>LIB: <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href='https://leafletjs.com/'>Leaflet</a> (<a href=https://github.com/Leaflet/Leaflet>src on GitHub</a>) → <a href=https://fukuno.jig.jp/2826>leaflet.mjs</a> (<a href=https://github.com/code4sabae/leaflet-mjs>src on GitHub</a>)</div>
-    <div>APP: <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> さかしる応援隊 (<a href="https://fukuno.jig.jp/3636">解説 by @taisukef</a>)</div>
+    <div>APP: <a href=https://creativecommons.org/licenses/by/4.0/deed.ja>CC BY</a> <a href=https://github.com/code4sakai-osaka/sakaiine>src on GitHub - Code for Sakai / さかしる応援隊</a> (<a href="https://fukuno.jig.jp/3636">解説 by @taisukef</a>)</div>
   </div>
   <script type="module" src="https://js.sabae.cc/QRCode.js"></script>
   <qr-code></qr-code>
